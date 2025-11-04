@@ -70,6 +70,24 @@ game:GetService("ReplicatedStorage").Remotes.ChangeCharacterBody:InvokeServer(un
 
     local animate = Character:WaitForChild("Animate")
 
+    -- Configuração das animações
+    for _, track in ipairs(Humanoid:GetPlayingAnimationTracks()) do
+        pcall(function()
+            track:Stop()
+            track:Destroy()
+        end)
+    end
+
+    animate.walk.WalkAnim.AnimationId   = "http://www.roblox.com/asset/?id=121350640829746"
+    animate.run.RunAnim.AnimationId     = "http://www.roblox.com/asset/?id=121350640829746"
+    animate.idle.Animation1.AnimationId = "http://www.roblox.com/asset/?id=135425213693488"
+    animate.idle.Animation2.AnimationId = "http://www.roblox.com/asset/?id=135579638960045"
+    animate.jump.JumpAnim.AnimationId   = "http://www.roblox.com/asset/?id=104108770420406"
+    animate.fall.FallAnim.AnimationId   = "http://www.roblox.com/asset/?id=104108770420406"
+    animate.climb.ClimbAnim.AnimationId = "http://www.roblox.com/asset/?id=421121499"
+
+    Humanoid.Jump = false
+
     -- Sistema de Bug Player
     local buggedPlayers = {}
     local bugConnections = {}
@@ -136,18 +154,88 @@ game:GetService("ReplicatedStorage").Remotes.ChangeCharacterBody:InvokeServer(un
         return true
     end
 
-    local function getPlayerFromMouse(mouse)
-        local target = mouse.Target
-        if not target then return nil end
-        local character = target.Parent
-        while character and not character:FindFirstChild("Humanoid") do
-            character = character.Parent
+    -- Comandos do chat para controle do bug
+    LocalPlayer.Chatted:Connect(function(message)
+        local msg = message:lower()
+        if msg == "/stopallbugs" then
+            for _, connection in pairs(bugConnections) do
+                if connection then connection:Disconnect() end
+            end
+            bugConnections = {}
+            buggedPlayers = {}
+            StarterGui:SetCore("SendNotification", {
+                Title = "Bug System",
+                Text = "Todos os bugs foram parados",
+                Duration = 3
+            })
+        elseif msg == "/buggedlist" then
+            local count = 0
+            local names = ""
+            for name in pairs(buggedPlayers) do 
+                count = count + 1 
+                if names == "" then
+                    names = name
+                else
+                    names = names .. ", " .. name
+                end
+            end
+            StarterGui:SetCore("SendNotification", {
+                Title = "Bug System",
+                Text = "Jogadores bugados: " .. count .. "\n" .. (names == "" and "Nenhum" or names),
+                Duration = 5
+            })
+        elseif msg:sub(1, 5) == "/bug " then
+            local targetName = msg:sub(6)
+            local targetPlayer = Players:FindFirstChild(targetName)
+            if targetPlayer then
+                local isNowBugged = bugPlayer(targetPlayer)
+                StarterGui:SetCore("SendNotification", {
+                    Title = "Bug System",
+                    Text = isNowBugged and "Bugando: " .. targetName or "Já estava bugado: " .. targetName,
+                    Duration = 3
+                })
+            else
+                StarterGui:SetCore("SendNotification", {
+                    Title = "Bug System",
+                    Text = "Jogador não encontrado: " .. targetName,
+                    Duration = 3
+                })
+            end
+        elseif msg:sub(1, 7) == "/unbug " then
+            local targetName = msg:sub(8)
+            local targetPlayer = Players:FindFirstChild(targetName)
+            if targetPlayer and buggedPlayers[targetName] then
+                if bugConnections[targetName] then
+                    bugConnections[targetName]:Disconnect()
+                    bugConnections[targetName] = nil
+                end
+                buggedPlayers[targetName] = nil
+                StarterGui:SetCore("SendNotification", {
+                    Title = "Bug System",
+                    Text = "Desbugado: " .. targetName,
+                    Duration = 3
+                })
+            else
+                StarterGui:SetCore("SendNotification", {
+                    Title = "Bug System",
+                    Text = "Jogador não está bugado: " .. targetName,
+                    Duration = 3
+                })
+            end
         end
-        if character and character:FindFirstChild("Humanoid") then
-            return Players:GetPlayerFromCharacter(character)
+    end)
+
+    -- Limpar quando jogador sair
+    Players.PlayerRemoving:Connect(function(leavingPlayer)
+        local playerName = leavingPlayer.Name
+        if bugConnections[playerName] then
+            bugConnections[playerName]:Disconnect()
+            bugConnections[playerName] = nil
         end
-        return nil
-    end
+        if buggedPlayers[playerName] then
+            buggedPlayers[playerName] = nil
+        end
+    end)
 
     -- Sistema de Expansão Dogger
     local cancelExpansion = false
